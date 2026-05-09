@@ -262,7 +262,8 @@
             state.prioritizedAmt += msg.amount_approved || 0;
         } else if (msg.decision === 'rejected') {
             state.rejectedCount++;
-            state.rejectedAmt += msg.amount_approved || 0;
+            // amount_approved is 0 for rejections; use what the fraudster TRIED to take.
+            state.rejectedAmt += msg.amount_requested || 0;
         }
         state.latencies.push(msg.inference_time_ms || 0);
 
