@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AidChain — Real-Time Disaster Aid on IBM Z</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse-gold {
+            0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 0 40px rgba(245, 158, 11, 0.9); }
+        }
+        @keyframes slide-in {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes count-pop {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.06); color: #fbbf24; }
+            100% { transform: scale(1); }
+        }
+        .pulse-gold { animation: pulse-gold 1.5s ease-in-out infinite; }
+        .slide-in { animation: slide-in 0.3s ease-out; }
+        .fade-in-up { animation: fade-in-up 0.4s ease-out; }
+        .count-pop { animation: count-pop 0.4s ease-out; }
+        .feed::-webkit-scrollbar { width: 6px; }
+        .feed::-webkit-scrollbar-track { background: #1e293b; }
+        .feed::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        body {
+            background:
+                radial-gradient(ellipse at top left, #0f1729 0%, transparent 50%),
+                radial-gradient(ellipse at bottom right, #1a1f3a 0%, transparent 50%),
+                #0a0e1a;
+            min-height: 100vh;
+        }
+        .live-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body class="text-slate-100 font-sans">
+
+<!-- ==================== HEADER ==================== -->
+<header class="border-b border-slate-700/50 backdrop-blur-md bg-slate-900/30">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center font-black text-xl">A</div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">AidChain</h1>
+                <p class="text-xs text-slate-400">Real-time disaster aid on IBM Z</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div id="connection-status" class="flex items-center gap-2 text-sm">
+                <span class="live-dot"></span>
+                <span class="text-slate-300">Live · IBM LinuxONE</span>
+            </div>
+            <div class="px-3 py-1 rounded-md bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono">
+                s390x · Telum AI
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ==================== MAIN ==================== -->
+<main class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-12 gap-6">
+
+    <!-- LEFT: stats + simulator + audit -->
+    <section class="col-span-12 lg:col-span-8 space-y-6">
+
+        <!-- Mega stat: total deployed -->
+        <div class="rounded-2xl bg-gradient-to-br from-blue-600/20 to-cyan-500/10 border border-blue-500/30 p-8">
+            <p class="text-blue-300 text-sm font-mono uppercase tracking-wider mb-2">Total Aid Deployed</p>
+            <p id="stat-deployed" class="text-6xl font-black tabular-nums">$0</p>
+            <p class="text-slate-400 text-sm mt-2">
+                <span id="stat-claims" class="text-slate-200 font-semibold">0</span> claims processed ·
+                Avg inference: <span id="stat-latency" class="text-slate-200 font-semibold">— ms</span>
+            </p>
+        </div>
+
+        <!-- 3 decision counters -->
+        <div class="grid grid-cols-3 gap-4">
+            <div class="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-5">
+                <p class="text-emerald-300 text-xs uppercase font-mono tracking-wider mb-1">Approved</p>
+                <p id="stat-approved" class="text-3xl font-bold tabular-nums">0</p>
+                <p id="stat-approved-amt" class="text-xs text-slate-400 mt-1">$0</p>
+            </div>
+            <div class="rounded-xl bg-amber-500/10 border border-amber-500/30 p-5">
+                <p class="text-amber-300 text-xs uppercase font-mono tracking-wider mb-1">Prioritized</p>
+                <p id="stat-prioritized" class="text-3xl font-bold tabular-nums">0</p>
+                <p id="stat-prioritized-amt" class="text-xs text-slate-400 mt-1">$0</p>
+            </div>
+            <div class="rounded-xl bg-red-500/10 border border-red-500/30 p-5">
+                <p class="text-red-300 text-xs uppercase font-mono tracking-wider mb-1">Rejected (Fraud)</p>
+                <p id="stat-rejected" class="text-3xl font-bold tabular-nums">0</p>
+                <p id="stat-rejected-amt" class="text-xs text-slate-400 mt-1">$0 saved</p>
+            </div>
+        </div>
+
+        <!-- Disaster simulator -->
+        <div class="rounded-2xl bg-slate-900/60 border border-slate-700/50 p-6">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-semibold">Disaster Simulator</h2>
+                    <p class="text-sm text-slate-400">
+                        Stream synthetic aid claims through AidChain. Watch FraudGuard and PriorityCare run on every transaction.
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <select id="sim-size" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+                    <option value="100">100 claims</option>
+                    <option value="500" selected>500 claims</option>
+                    <option value="1000">1,000 claims</option>
+                    <option value="5000">5,000 claims</option>
+                </select>
+                <button id="sim-button" onclick="runSimulation()"
+                    class="flex-1 px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 font-semibold transition-all transform hover:scale-[1.01] shadow-lg shadow-blue-500/20">
+                    Simulate Hurricane Landfall
+                </button>
+                <button onclick="resetStats()"
+                    class="px-4 py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm border border-slate-700">
+                    Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Audit chain status -->
+        <div class="rounded-2xl bg-slate-900/60 border border-slate-700/50 p-6">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="text-lg font-semibold">Audit Ledger</h2>
+                    <p class="text-sm text-slate-400">Every decision is HMAC-signed and chained. Tamper-evident, queryable.</p>
+                </div>
+                <button onclick="verifyChain()"
+                    class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm border border-slate-700">
+                    Verify Chain
+                </button>
+            </div>
+            <div id="audit-status" class="text-sm font-mono text-slate-300 bg-slate-950/50 rounded-lg p-4 min-h-[60px]">
+                Click "Verify Chain" to cryptographically validate all signed decisions.
+            </div>
+        </div>
+    </section>
+
+    <!-- RIGHT: live feed + Maria card -->
+    <aside class="col-span-12 lg:col-span-4 space-y-6">
+
+        <!-- The Maria moment -->
+        <div id="maria-card" class="hidden rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-600/10 border border-amber-400/50 p-6 pulse-gold">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-12 h-12 rounded-full bg-amber-500/30 flex items-center justify-center text-2xl">🏥</div>
+                <div>
+                    <p class="text-xs text-amber-300 font-mono uppercase tracking-wider">High-Priority Case</p>
+                    <p id="maria-name" class="text-lg font-bold">Vulnerable claimant</p>
+                </div>
+            </div>
+            <div class="space-y-1 text-sm">
+                <p class="text-slate-300"><span id="maria-details">—</span></p>
+                <p class="text-amber-200">Vulnerability score: <span id="maria-vuln" class="font-bold">—</span></p>
+                <p class="text-emerald-300 text-base font-semibold mt-2">
+                    ✓ Approved in <span id="maria-time">—</span> ms
+                </p>
+                <p class="text-amber-200 text-base font-semibold">
+                    $<span id="maria-amount">—</span> dispatched
+                </p>
+            </div>
+        </div>
+
+        <!-- Live feed -->
+        <div class="rounded-2xl bg-slate-900/60 border border-slate-700/50 overflow-hidden">
+            <div class="px-5 py-3 border-b border-slate-700/50 flex items-center justify-between">
+                <h2 class="font-semibold flex items-center gap-2">
+                    <span class="live-dot"></span>
+                    Live Decision Feed
+                </h2>
+                <p class="text-xs text-slate-400" id="feed-counter">0 events</p>
+            </div>
+            <div id="feed" class="feed h-[600px] overflow-y-auto p-3 space-y-2">
+                <p class="text-center text-slate-500 text-sm py-8">
+                    Waiting for claims...<br />
+                    Click "Simulate Hurricane Landfall" to start.
+                </p>
+            </div>
+        </div>
+    </aside>
+</main>
+
+<footer class="max-w-7xl mx-auto px-6 py-6 text-center text-xs text-slate-500">
+    AidChain · IBM Z Sheridan x UNSA Sheridan Hackathon 2026 · UN SDG track
+</footer>
+
+<!-- ==================== SCRIPTS ==================== -->
+<script>
+    // ============================================================
+    // STATE
+    // ============================================================
+    const state = {
+        approvedCount: 0,
+        approvedAmt: 0,
+        prioritizedCount: 0,
+        prioritizedAmt: 0,
+        rejectedCount: 0,
+        rejectedAmt: 0,
+        latencies: [],
+        feedCount: 0,
+        ws: null,
+    };
+
+    // ============================================================
+    // WEBSOCKET CONNECTION
+    // ============================================================
+    function connect() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const url = `${proto}//${location.host}/live`;
+        state.ws = new WebSocket(url);
+
+        state.ws.onopen = () => {
+            console.log('[ws] connected');
+            // Keep-alive
+            setInterval(() => {
+                if (state.ws.readyState === WebSocket.OPEN) state.ws.send('ping');
+            }, 15000);
+        };
+
+        state.ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'decision') handleDecision(msg);
+        };
+
+        state.ws.onclose = () => {
+            console.log('[ws] disconnected — reconnecting in 2s');
+            setTimeout(connect, 2000);
+        };
+
+        state.ws.onerror = (e) => console.error('[ws] error', e);
+    }
+
+    // ============================================================
+    // HANDLE INCOMING DECISION
+    // ============================================================
+    function handleDecision(msg) {
+        // Update counters
+        if (msg.decision === 'approved') {
+            state.approvedCount++;
+            state.approvedAmt += msg.amount_approved || 0;
+        } else if (msg.decision === 'prioritized') {
+            state.prioritizedCount++;
+            state.prioritizedAmt += msg.amount_approved || 0;
+        } else if (msg.decision === 'rejected') {
+            state.rejectedCount++;
+            state.rejectedAmt += msg.amount_approved || 0;
+        }
+        state.latencies.push(msg.inference_time_ms || 0);
+
+        // Trigger Maria moment for very vulnerable claimants
+        if (msg.decision === 'prioritized' && msg.vulnerability_score >= 0.85) {
+            showMariaCard(msg);
+        }
+
+        renderStats();
+        appendFeedItem(msg);
+    }
+
+    // ============================================================
+    // RENDER STATS
+    // ============================================================
+    function renderStats() {
+        const total = state.approvedAmt + state.prioritizedAmt;
+        const totalCount = state.approvedCount + state.prioritizedCount + state.rejectedCount;
+        const avgLatency = state.latencies.length
+            ? (state.latencies.reduce((a, b) => a + b, 0) / state.latencies.length).toFixed(2)
+            : '—';
+
+        animateText('stat-deployed', '$' + Math.round(total).toLocaleString());
+        animateText('stat-claims', totalCount.toLocaleString());
+        document.getElementById('stat-latency').textContent = avgLatency + ' ms';
+
+        document.getElementById('stat-approved').textContent = state.approvedCount.toLocaleString();
+        document.getElementById('stat-approved-amt').textContent = '$' + Math.round(state.approvedAmt).toLocaleString();
+        document.getElementById('stat-prioritized').textContent = state.prioritizedCount.toLocaleString();
+        document.getElementById('stat-prioritized-amt').textContent = '$' + Math.round(state.prioritizedAmt).toLocaleString();
+        document.getElementById('stat-rejected').textContent = state.rejectedCount.toLocaleString();
+        document.getElementById('stat-rejected-amt').textContent = '$' + Math.round(state.rejectedAmt).toLocaleString() + ' saved';
+    }
+
+    function animateText(id, value) {
+        const el = document.getElementById(id);
+        if (el.textContent === value) return;
+        el.textContent = value;
+        el.classList.remove('count-pop');
+        void el.offsetWidth;  // restart animation
+        el.classList.add('count-pop');
+    }
+
+    // ============================================================
+    // FEED
+    // ============================================================
+    function appendFeedItem(msg) {
+        const feed = document.getElementById('feed');
+
+        // Clear placeholder on first event
+        if (state.feedCount === 0) feed.innerHTML = '';
+
+        state.feedCount++;
+        document.getElementById('feed-counter').textContent = state.feedCount.toLocaleString() + ' events';
+
+        const colorMap = {
+            approved: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-300', label: 'APPROVED' },
+            prioritized: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-300', label: 'PRIORITIZED' },
+            rejected: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-300', label: 'REJECTED' },
+        };
+        const c = colorMap[msg.decision] || colorMap.approved;
+
+        const item = document.createElement('div');
+        item.className = `slide-in rounded-lg ${c.bg} border ${c.border} p-3 text-xs`;
+        item.innerHTML = `
+            <div class="flex items-start justify-between gap-2">
+                <div class="font-mono ${c.text} font-bold">${c.label}</div>
+                <div class="text-slate-500 font-mono">${(msg.inference_time_ms || 0).toFixed(2)}ms</div>
+            </div>
+            <div class="font-mono text-slate-300 mt-1">${msg.claim_id || '—'}</div>
+            <div class="flex items-center justify-between mt-1">
+                <div class="text-slate-400">
+                    age <span class="text-slate-200">${msg.age || '—'}</span> ·
+                    fraud <span class="text-slate-200">${(msg.fraud_score || 0).toFixed(2)}</span> ·
+                    vuln <span class="text-slate-200">${(msg.vulnerability_score || 0).toFixed(2)}</span>
+                </div>
+                <div class="text-slate-200 font-semibold">$${Math.round(msg.amount_approved || 0).toLocaleString()}</div>
+            </div>
+        `;
+        feed.prepend(item);
+
+        // Cap feed length to avoid DOM bloat
+        while (feed.children.length > 200) feed.removeChild(feed.lastChild);
+    }
+
+    // ============================================================
+    // MARIA CARD
+    // ============================================================
+    function showMariaCard(msg) {
+        const card = document.getElementById('maria-card');
+        card.classList.remove('hidden');
+        card.classList.remove('fade-in-up');
+        void card.offsetWidth;
+        card.classList.add('fade-in-up');
+
+        const name = msg.claimant_name || `Claimant ${msg.claim_id}`;
+        document.getElementById('maria-name').textContent = name;
+        document.getElementById('maria-details').textContent =
+            `Age ${msg.age}${msg.disability ? ' · Disabled' : ''}${msg.dependents ? ` · ${msg.dependents} dependents` : ''}`;
+        document.getElementById('maria-vuln').textContent = msg.vulnerability_score.toFixed(2);
+        document.getElementById('maria-time').textContent = (msg.inference_time_ms || 0).toFixed(2);
+        document.getElementById('maria-amount').textContent = Math.round(msg.amount_approved).toLocaleString();
+    }
+
+    // ============================================================
+    // BUTTONS
+    // ============================================================
+    async function runSimulation() {
+        const n = document.getElementById('sim-size').value;
+        const btn = document.getElementById('sim-button');
+        btn.disabled = true;
+        btn.textContent = `Streaming ${parseInt(n).toLocaleString()} claims through Telum...`;
+
+        try {
+            const res = await fetch(`/simulate?n=${n}`, { method: 'POST' });
+            await res.json();
+        } catch (e) {
+            alert('Failed to start simulation: ' + e.message);
+        }
+
+        // Re-enable button after enough time to stream the claims
+        const waitMs = Math.max(3000, n * 8);
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = 'Simulate Hurricane Landfall';
+        }, waitMs);
+    }
+
+    function resetStats() {
+        state.approvedCount = state.approvedAmt = 0;
+        state.prioritizedCount = state.prioritizedAmt = 0;
+        state.rejectedCount = state.rejectedAmt = 0;
+        state.latencies = [];
+        state.feedCount = 0;
+        document.getElementById('feed').innerHTML =
+            '<p class="text-center text-slate-500 text-sm py-8">Waiting for claims...<br />Click "Simulate Hurricane Landfall" to start.</p>';
+        document.getElementById('feed-counter').textContent = '0 events';
+        document.getElementById('maria-card').classList.add('hidden');
+        renderStats();
+    }
+
+    async function verifyChain() {
+        const status = document.getElementById('audit-status');
+        status.textContent = 'Verifying chain integrity...';
+        try {
+            const res = await fetch('/audit/verify');
+            const data = await res.json();
+            if (data.valid) {
+                status.innerHTML = `
+                    <span class="text-emerald-400">✓ CHAIN VALID</span> ·
+                    ${data.entries_checked.toLocaleString()} signed decisions verified ·
+                    HMAC-SHA256 chain intact
+                `;
+            } else {
+                status.innerHTML = `<span class="text-red-400">✗ TAMPER DETECTED</span> at sequence ${data.first_invalid}`;
+            }
+        } catch (e) {
+            status.textContent = 'Verification failed: ' + e.message;
+        }
+    }
+
+    // ============================================================
+    // INIT
+    // ============================================================
+    renderStats();
+    connect();
+</script>
+</body>
+</html>

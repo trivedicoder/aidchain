@@ -1,9 +1,15 @@
+# AidChain — pip-installed dependencies
+#
+# IMPORTANT: numpy, pandas, scipy, scikit-learn, and joblib are NOT in this
+# file because s390x (IBM Z) lacks pre-built wheels for scipy/sklearn and
+# compiling from source requires Fortran toolchain. Instead they're installed
+# via apt (python3-numpy, python3-pandas, etc.) and the venv is created with
+# --system-site-packages so it can see them.
+#
+# See scripts/setup_server.sh for the full install flow.
+
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.6.0
-scikit-learn>=1.4.0
-pandas>=2.2.0
-numpy>=1.26.0
-joblib>=1.3.0
 python-multipart>=0.0.9
 websockets>=12.0

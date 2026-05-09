@@ -23,9 +23,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
 
 from backend import inference, ledger
 from backend.models import AidClaim, ClaimDecision
+
+FRONTEND_DIR = Path(__file__).parent.parent / 'frontend'
 
 app = FastAPI(
     title='AidChain',
@@ -69,8 +72,21 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@app.get('/')
-def root():
+@app.get('/', response_class=HTMLResponse)
+def dashboard():
+    """Serve the live operator dashboard."""
+    index = FRONTEND_DIR / 'index.html'
+    if not index.exists():
+        return HTMLResponse(
+            '<h1>Dashboard not found</h1>'
+            '<p>frontend/index.html is missing. API is still available at <a href="/api">/api</a>.</p>',
+            status_code=404,
+        )
+    return FileResponse(index)
+
+
+@app.get('/api')
+def api_root():
     return {
         'service': 'AidChain',
         'version': '0.1.0',
