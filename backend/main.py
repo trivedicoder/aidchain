@@ -195,9 +195,9 @@ def stats():
 
 @app.post('/maria')
 async def submit_maria():
-    """Inject Maria Rodriguez's claim — Hurricane Maria, San Juan, age 67, displaced.
+    """Inject Maria Rodriguez's claim. Hurricane Maria, San Juan, age 67, displaced.
 
-    Demo-only endpoint that ties our Devpost narrative to the live dashboard.
+    Demo-only endpoint that ties the Devpost narrative to the live dashboard.
     Maria's profile is engineered to score very high on PriorityCare so the
     high-priority card always lights up on stage.
     """
@@ -238,13 +238,28 @@ async def submit_maria():
     return payload
 
 
+@app.post('/admin/reset')
+def reset_ledger():
+    """DEMO ONLY: wipe the audit ledger so the next run starts clean.
+
+    Removes ledger.db entirely (including any tampered entries from
+    /admin/tamper) and re-creates the empty schema. Called by the
+    dashboard's Reset button so each demo run is fresh.
+    """
+    import os
+    if os.path.exists(ledger.LEDGER_DB_PATH):
+        os.remove(ledger.LEDGER_DB_PATH)
+    ledger._init_db()
+    return {'status': 'reset', 'message': 'Audit ledger wiped.'}
+
+
 @app.post('/admin/tamper')
 def tamper_demo():
     """DEMO ONLY: tamper with a random ledger entry to prove the chain catches it.
 
     Modifies the payload column for a random row WITHOUT recomputing the hash,
     so verify_chain will detect the inconsistency. Used by the dashboard's
-    "Demonstrate Tamper" button.
+    Demonstrate Tamper button.
     """
     import json
     import sqlite3
@@ -255,7 +270,7 @@ def tamper_demo():
     row = cur.fetchone()
     if not row:
         conn.close()
-        raise HTTPException(400, 'Ledger is empty — run a simulation first.')
+        raise HTTPException(400, 'Ledger is empty. Run a simulation first.')
 
     seq, payload_json = row
     payload = json.loads(payload_json)

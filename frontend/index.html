@@ -425,7 +425,14 @@
         }
     }
 
-    function resetStats() {
+    async function resetStats() {
+        // Wipe the backend ledger so Verify Chain starts fresh and any
+        // previous tamper demo doesn't leak into the next run.
+        try {
+            await fetch('/admin/reset', { method: 'POST' });
+        } catch (e) {
+            console.warn('ledger reset failed:', e);
+        }
         state.approvedCount = state.approvedAmt = 0;
         state.prioritizedCount = state.prioritizedAmt = 0;
         state.rejectedCount = state.rejectedAmt = 0;
@@ -435,6 +442,8 @@
             '<p class="text-center text-slate-500 text-sm py-8">Waiting for claims...<br />Click "Simulate Hurricane Landfall" to start.</p>';
         document.getElementById('feed-counter').textContent = '0 events';
         document.getElementById('maria-card').classList.add('hidden');
+        document.getElementById('audit-status').textContent =
+            'Click "Verify Chain" to cryptographically validate all signed decisions.';
         renderStats();
     }
 
