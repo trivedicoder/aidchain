@@ -90,5 +90,6 @@ def score(claim: Dict) -> Dict:
         'decision': decision,
         'reasoning': reasoning,
         'amount_approved': round(amount_approved, 2),
+        'amount_requested': round(float(claim.get('amount_requested', 0)), 2),
         'inference_time_ms': round(inference_ms, 3),
     }

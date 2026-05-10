@@ -136,6 +136,10 @@
                     Reset
                 </button>
             </div>
+            <button onclick="submitMaria()"
+                class="mt-3 w-full px-6 py-3 rounded-lg bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-500 hover:to-orange-400 font-semibold transition-all transform hover:scale-[1.005] shadow-lg shadow-amber-500/20">
+                Submit Maria's Claim (San Juan, Puerto Rico)
+            </button>
         </div>
 
         <!-- Audit chain status -->
@@ -145,10 +149,16 @@
                     <h2 class="text-lg font-semibold">Audit Ledger</h2>
                     <p class="text-sm text-slate-400">Every decision is HMAC-signed and chained. Tamper-evident, queryable.</p>
                 </div>
-                <button onclick="verifyChain()"
-                    class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm border border-slate-700">
-                    Verify Chain
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="demonstrateTamper()"
+                        class="px-4 py-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 text-sm border border-red-700/40 text-red-200">
+                        Demonstrate Tamper
+                    </button>
+                    <button onclick="verifyChain()"
+                        class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm border border-slate-700">
+                        Verify Chain
+                    </button>
+                </div>
             </div>
             <div id="audit-status" class="text-sm font-mono text-slate-300 bg-slate-950/50 rounded-lg p-4 min-h-[60px]">
                 Click "Verify Chain" to cryptographically validate all signed decisions.
@@ -267,8 +277,8 @@
         }
         state.latencies.push(msg.inference_time_ms || 0);
 
-        // Trigger Maria moment for very vulnerable claimants
-        if (msg.decision === 'prioritized' && msg.vulnerability_score >= 0.85) {
+        // Trigger Maria moment for very vulnerable claimants OR the named Maria scenario
+        if (msg.maria_scenario === true || (msg.decision === 'prioritized' && msg.vulnerability_score >= 0.85)) {
             showMariaCard(msg);
         }
 
@@ -362,7 +372,7 @@
         const name = msg.claimant_name || `Claimant ${msg.claim_id}`;
         document.getElementById('maria-name').textContent = name;
         document.getElementById('maria-details').textContent =
-            `Age ${msg.age}${msg.disability ? ' · Disabled' : ''}${msg.dependents ? ` · ${msg.dependents} dependents` : ''}`;
+            `Age ${msg.age}${msg.disability ? ' · Disabled' : ''}${msg.dependents ? ` · ${msg.dependents} dependents` : ''}${msg.location ? ` · ${msg.location}` : ''}`;
         document.getElementById('maria-vuln').textContent = msg.vulnerability_score.toFixed(2);
         document.getElementById('maria-time').textContent = (msg.inference_time_ms || 0).toFixed(2);
         document.getElementById('maria-amount').textContent = Math.round(msg.amount_approved).toLocaleString();
@@ -390,6 +400,29 @@
             btn.disabled = false;
             btn.textContent = 'Simulate Hurricane Landfall';
         }, waitMs);
+    }
+
+    async function submitMaria() {
+        try {
+            await fetch('/maria', { method: 'POST' });
+        } catch (e) {
+            alert('Maria submission failed: ' + e.message);
+        }
+    }
+
+    async function demonstrateTamper() {
+        const status = document.getElementById('audit-status');
+        status.innerHTML = '<span class="text-amber-400">⚠ Tampering with a random ledger entry...</span>';
+        try {
+            const tres = await fetch('/admin/tamper', { method: 'POST' });
+            const tdata = await tres.json();
+            await new Promise(r => setTimeout(r, 700));
+            status.innerHTML = `<span class="text-amber-400">⚠ Sequence ${tdata.tampered_sequence} forged: $${tdata.original_amount.toLocaleString()} → $${tdata.forged_amount.toLocaleString()}.</span> Re-verifying chain...`;
+            await new Promise(r => setTimeout(r, 800));
+            await verifyChain();
+        } catch (e) {
+            status.innerHTML = `<span class="text-red-400">✗ Tamper demo failed: ${e.message}</span>`;
+        }
     }
 
     function resetStats() {

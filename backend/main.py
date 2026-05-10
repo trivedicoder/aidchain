@@ -169,6 +169,17 @@ async def _run_simulation(df):
             print(f"Error processing {claim_dict.get('claim_id')}: {e}")
 
 
+@app.get('/audit')
+def audit_recent(limit: int = 50):
+    return {'entries': ledger.get_all(limit=limit)}
+
+
+# /audit/verify must come BEFORE /audit/{claim_id} or FastAPI matches "verify" as a claim_id.
+@app.get('/audit/verify')
+def audit_verify():
+    return ledger.verify_chain()
+
+
 @app.get('/audit/{claim_id}')
 def audit_claim(claim_id: str):
     entry = ledger.get_by_claim(claim_id)
@@ -177,19 +188,93 @@ def audit_claim(claim_id: str):
     return entry
 
 
-@app.get('/audit')
-def audit_recent(limit: int = 50):
-    return {'entries': ledger.get_all(limit=limit)}
-
-
-@app.get('/audit/verify')
-def audit_verify():
-    return ledger.verify_chain()
-
-
 @app.get('/stats')
 def stats():
     return ledger.stats()
+
+
+@app.post('/maria')
+async def submit_maria():
+    """Inject Maria Rodriguez's claim — Hurricane Maria, San Juan, age 67, displaced.
+
+    Demo-only endpoint that ties our Devpost narrative to the live dashboard.
+    Maria's profile is engineered to score very high on PriorityCare so the
+    high-priority card always lights up on stage.
+    """
+    import time as _t
+    maria = {
+        'claim_id': f'MARIA-{int(_t.time())}',
+        'age': 67,
+        'disability': 1,
+        'dependents': 3,
+        'income_proxy': 8000.0,
+        'displaced': 1,
+        'in_affected_zone': 1,
+        'prior_claims_count': 0,
+        'amount_requested': 2500.0,
+        'days_since_disaster': 1.0,
+        'claimant_name': 'Maria Rodriguez',
+    }
+    result = inference.score(maria)
+    ledger.append(
+        claim_id=maria['claim_id'],
+        decision=result['decision'],
+        fraud_score=result['fraud_score'],
+        vulnerability_score=result['vulnerability_score'],
+        amount_approved=result['amount_approved'],
+    )
+    payload = {
+        'type': 'decision',
+        'claim_id': maria['claim_id'],
+        'claimant_name': 'Maria Rodriguez',
+        'location': 'San Juan, Puerto Rico',
+        'maria_scenario': True,
+        'age': maria['age'],
+        'disability': maria['disability'],
+        'dependents': maria['dependents'],
+        **result,
+    }
+    await manager.broadcast(payload)
+    return payload
+
+
+@app.post('/admin/tamper')
+def tamper_demo():
+    """DEMO ONLY: tamper with a random ledger entry to prove the chain catches it.
+
+    Modifies the payload column for a random row WITHOUT recomputing the hash,
+    so verify_chain will detect the inconsistency. Used by the dashboard's
+    "Demonstrate Tamper" button.
+    """
+    import json
+    import sqlite3
+
+    conn = sqlite3.connect(ledger.LEDGER_DB_PATH)
+    cur = conn.cursor()
+    cur.execute('SELECT sequence, payload FROM ledger ORDER BY RANDOM() LIMIT 1')
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(400, 'Ledger is empty — run a simulation first.')
+
+    seq, payload_json = row
+    payload = json.loads(payload_json)
+    original_amount = payload['amount_approved']
+    payload['amount_approved'] = 9999999.99  # forge!
+
+    cur.execute(
+        'UPDATE ledger SET amount_approved = ?, payload = ? WHERE sequence = ?',
+        (9999999.99, json.dumps(payload), seq),
+    )
+    conn.commit()
+    conn.close()
+
+    return {
+        'tampered_sequence': seq,
+        'original_amount': original_amount,
+        'forged_amount': 9999999.99,
+        'message': f'Sequence {seq} forged. Run /audit/verify to see the chain catch it.',
+    }
 
 
 @app.websocket('/live')
