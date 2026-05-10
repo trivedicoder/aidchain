@@ -138,7 +138,7 @@ curl http://localhost:8000/audit/verify
 ## Team
 
 - **Arya Trivedi** — IBM Z deployment, demo lead
-- **[Teammate]** — TBD
+- **Addey Jnr Prince Isaac Kofi** — Team mate
 - **Claude** — coding teammate
 
 ## License
